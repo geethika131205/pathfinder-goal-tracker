@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pathfinder — Goal Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --accent: #f0c040;
+    --accent2: #e07040;
+    --text: #e8e8f0;
+    --muted: #6a6a8a;
+    --green: #40d0a0;
+    --red: #e05060;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 20% 20%, rgba(240,192,64,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(224,112,64,0.04) 0%, transparent 50%);
+    animation: bgPulse 8s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes bgPulse {
+    0% { transform: scale(1) rotate(0deg); }
+    100% { transform: scale(1.1) rotate(3deg); }
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 60px;
+    animation: fadeDown 0.8s ease;
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(40px, 6vw, 72px);
+    font-weight: 900;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 15px;
+    margin-top: 12px;
+    font-weight: 300;
+  }
+
+  /* Long Term Goal Section */
+  .ltg-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s ease 0.2s both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ltg-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+    margin-bottom: 16px;
+  }
+
+  .ltg-input-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .ltg-input-wrap {
+    flex: 1;
+    position: relative;
+  }
+
+  input[type="text"], textarea, select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    padding: 14px 18px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input[type="text"]:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(240,192,64,0.1);
+  }
+
+  .ltg-deadline {
+    width: 160px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    padding: 14px 18px;
+    outline: none;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #0a0a0f;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 24px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+
+  .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); background: rgba(240,192,64,0.05); }
+
+  /* Long Term Goal Display */
+  .ltg-display {
+    display: none;
+  }
+
+  .ltg-display.active {
+    display: block;
+  }
+
+  .ltg-card {
+    background: linear-gradient(135deg, rgba(240,192,64,0.08), rgba(224,112,64,0.08));
+    border: 1px solid rgba(240,192,64,0.2);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+
+  .ltg-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .ltg-meta {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .ltg-deadline-badge {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .progress-bar-wrap {
+    margin-top: 16px;
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 99px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ltg-edit-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .ltg-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* AI Suggestions */
+  .ai-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s ease 0.3s both;
+    display: none;
+  }
+
+  .ai-section.active { display: block; }
+
+  .ai-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: gap;
+    gap: 12px;
+  }
+
+  .ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(64,208,160,0.1);
+    border: 1px solid rgba(64,208,160,0.2);
+    color: var(--green);
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .ai-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .suggestions-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .suggestion-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: slideIn 0.4s ease both;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .suggestion-card:hover { border-color: var(--accent); transform: translateX(4px); }
+
+  .suggestion-text { font-size: 14px; flex: 1; line-height: 1.5; }
+
+  .suggestion-duration {
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(240,192,64,0.1);
+    border-radius: 6px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+
+  .suggestion-actions { display: flex; gap: 8px; }
+
+  .approve-btn {
+    background: rgba(64,208,160,0.1);
+    border: 1px solid rgba(64,208,160,0.2);
+    color: var(--green);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .approve-btn:hover { background: rgba(64,208,160,0.2); }
+
+  .reject-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .reject-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .loading-suggestions {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Short Term Goals */
+  .stg-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s ease 0.4s both;
+    display: none;
+  }
+
+  .stg-section.active { display: block; }
+
+  .stg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .add-goal-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .add-goal-row input { flex: 1; min-width: 200px; }
+
+  .goals-list { display: grid; gap: 10px; }
+
+  .goal-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.2s;
+    animation: slideIn 0.3s ease both;
+  }
+
+  .goal-item:hover { border-color: rgba(240,192,64,0.3); }
+
+  .goal-item.completed {
+    opacity: 0.5;
+    border-color: rgba(64,208,160,0.2);
+  }
+
+  .goal-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .goal-checkbox.checked {
+    background: var(--green);
+    border-color: var(--green);
+  }
+
+  .goal-checkbox.checked::after {
+    content: '✓';
+    color: #0a0a0f;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .goal-content { flex: 1; }
+
+  .goal-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .goal-item.completed .goal-title {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+
+  .goal-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .goal-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(240,192,64,0.1);
+    color: var(--accent);
+  }
+
+  .goal-tag.overdue {
+    background: rgba(224,80,96,0.1);
+    color: var(--red);
+  }
+
+  .goal-tag.done {
+    background: rgba(64,208,160,0.1);
+    color: var(--green);
+  }
+
+  .goal-delete {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+
+  .goal-delete:hover { color: var(--red); }
+
+  /* Timeline */
+  .timeline-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s ease 0.5s both;
+    display: none;
+  }
+
+  .timeline-section.active { display: block; }
+
+  .timeline {
+    position: relative;
+    padding-left: 30px;
+    margin-top: 20px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--surface2));
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+    animation: slideIn 0.4s ease both;
+  }
+
+  .timeline-dot {
+    position: absolute;
+    left: -26px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg);
+    transition: background 0.3s;
+  }
+
+  .timeline-dot.done {
+    background: var(--green);
+    border-color: var(--green);
+  }
+
+  .timeline-dot.current {
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(240,192,64,0.4);
+  }
+
+  .timeline-content {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+  }
+
+  .timeline-content h4 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .timeline-content p { font-size: 12px; color: var(--muted); }
+
+  /* AI Coach */
+  .coach-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s ease 0.6s both;
+    display: none;
+  }
+
+  .coach-section.active { display: block; }
+
+  .coach-message {
+    background: linear-gradient(135deg, rgba(64,208,160,0.06), rgba(240,192,64,0.06));
+    border: 1px solid rgba(64,208,160,0.15);
+    border-radius: 14px;
+    padding: 20px 24px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    position: relative;
+    margin-top: 16px;
+  }
+
+  .coach-avatar {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .coach-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .coach-name { font-weight: 500; font-size: 14px; }
+  .coach-subtitle { font-size: 12px; color: var(--muted); }
+
+  .coach-loading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 20px 0;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+
+  .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-text { font-size: 14px; }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* Notification toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    max-width: 300px;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 600px) {
+    .ltg-input-row { flex-direction: column; }
+    .ltg-deadline { width: 100%; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .add-goal-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">✦ Pathfinder</div>
+    <h1>Your Journey<br>Starts Here</h1>
+    <p class="tagline">Set one big goal. Let AI map the path. Track every step.</p>
+  </header>
+
+  <!-- Long Term Goal Input -->
+  <div class="ltg-section" id="ltgInput">
+    <div class="section-label">✦ Long Term Goal</div>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:20px;">What's the ONE big thing you want to achieve? Be specific.</p>
+    <div class="ltg-input-row">
+      <div class="ltg-input-wrap">
+        <input type="text" id="ltgText" placeholder="e.g. Become a full-stack developer and get a job" />
+      </div>
+      <input type="date" class="ltg-deadline" id="ltgDeadline" />
+      <button class="btn" onclick="setLongTermGoal()">Set Goal →</button>
+    </div>
+  </div>
+
+  <!-- Long Term Goal Display -->
+  <div class="ltg-section ltg-display" id="ltgDisplay">
+    <div class="section-label">✦ Long Term Goal</div>
+    <div class="ltg-card">
+      <button class="ltg-edit-btn" onclick="editLTG()">Edit</button>
+      <div class="ltg-title" id="ltgDisplayTitle"></div>
+      <div class="ltg-meta">
+        <div class="ltg-deadline-badge">🎯 Target: <span id="ltgDisplayDeadline"></span></div>
+        <div class="ltg-deadline-badge">⏳ <span id="ltgDaysLeft"></span> days remaining</div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-label">
+          <span>Overall Progress</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-number" id="statTotal">0</div>
+          <div class="stat-label">Total Goals</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="statDone">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="statLeft">0</div>
+          <div class="stat-label">Remaining</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Suggestions -->
+  <div class="ai-section" id="aiSection">
+    <div class="ai-header">
+      <div>
+        <div class="section-label">✦ AI Suggested Goals</div>
+        <p style="font-size:13px;color:var(--muted);">Based on your long term goal, here are recommended short term goals</p>
+      </div>
+      <div class="ai-badge"><div class="ai-dot"></div> AI Powered</div>
+    </div>
+    <div id="suggestionsContainer">
+      <div class="loading-suggestions">
+        <div class="spinner"></div>
+        <p>Analyzing your goal...</p>
+      </div>
+    </div>
+    <div style="margin-top:16px;text-align:right;">
+      <button class="btn-ghost" onclick="regenerateSuggestions()">↻ Regenerate suggestions</button>
+    </div>
+  </div>
+
+  <!-- Short Term Goals -->
+  <div class="stg-section" id="stgSection">
+    <div class="stg-header">
+      <div>
+        <div class="section-label">✦ Short Term Goals</div>
+        <p style="font-size:13px;color:var(--muted);">Steps building toward your big goal</p>
+      </div>
+    </div>
+    <div class="add-goal-row">
+      <input type="text" id="newGoalText" placeholder="Add a short term goal..." onkeydown="if(event.key==='Enter')addManualGoal()" />
+      <button class="btn" onclick="addManualGoal()">+ Add</button>
+    </div>
+    <div class="goals-list" id="goalsList">
+      <div class="empty-state">
+        <div class="empty-icon">🎯</div>
+        <p class="empty-text">Approve AI suggestions or add your own goals above</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline-section" id="timelineSection">
+    <div class="section-label">✦ Journey Roadmap</div>
+    <p style="font-size:13px;color:var(--muted);">Your path from today to your big goal</p>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <!-- AI Coach -->
+  <div class="coach-section" id="coachSection">
+    <div class="section-label">✦ AI Coach</div>
+    <div class="coach-header">
+      <div class="coach-avatar">🧭</div>
+      <div>
+        <div class="coach-name">Pathfinder AI</div>
+        <div class="coach-subtitle">Personal goal coach</div>
+      </div>
+      <button class="btn-ghost" style="margin-left:auto;" onclick="getCoaching()">Get Advice</button>
+    </div>
+    <div id="coachContent">
+      <div class="coach-message" style="color:var(--muted);font-style:italic;">
+        Click "Get Advice" to receive personalized coaching based on your current progress.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  let state = {
+    ltg: null,
+    deadline: null,
+    goals: [],
+    nextId: 1
+  };
+
+  // Load from memory (session only)
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  async function setLongTermGoal() {
+    const text = document.getElementById('ltgText').value.trim();
+    const deadline = document.getElementById('ltgDeadline').value;
+    if (!text) { showToast('Please enter your long term goal'); return; }
+    if (!deadline) { showToast('Please set a target date'); return; }
+
+    state.ltg = text;
+    state.deadline = deadline;
+
+    // Show display, hide input
+    document.getElementById('ltgInput').style.display = 'none';
+    document.getElementById('ltgDisplay').classList.add('active');
+    document.getElementById('ltgDisplayTitle').textContent = text;
+
+    const d = new Date(deadline);
+    document.getElementById('ltgDisplayDeadline').textContent = d.toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' });
+
+    const today = new Date();
+    const days = Math.ceil((d - today) / (1000*60*60*24));
+    document.getElementById('ltgDaysLeft').textContent = days;
+
+    updateStats();
+
+    // Show sections
+    document.getElementById('aiSection').classList.add('active');
+    document.getElementById('stgSection').classList.add('active');
+    document.getElementById('timelineSection').classList.add('active');
+    document.getElementById('coachSection').classList.add('active');
+
+    await fetchSuggestions(text);
+    updateTimeline();
+  }
+
+  function editLTG() {
+    document.getElementById('ltgInput').style.display = 'block';
+    document.getElementById('ltgDisplay').classList.remove('active');
+    document.getElementById('ltgText').value = state.ltg || '';
+    document.getElementById('ltgDeadline').value = state.deadline || '';
+  }
+
+  async function fetchSuggestions(goal) {
+    document.getElementById('suggestionsContainer').innerHTML = `
+      <div class="loading-suggestions">
+        <div class="spinner"></div>
+        <p>AI is analyzing your goal...</p>
+      </div>`;
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `You are a goal-setting expert. Given this long-term goal: "${goal}"
+            
+Generate exactly 5 short-term goals that directly help achieve this long term goal.
+Respond ONLY with a JSON array, no markdown, no explanation:
+[
+  {"title": "short term goal", "duration": "2 weeks", "why": "one line reason this helps the big goal"},
+  ...
+]
+Make goals specific, actionable, and progressive (easier first, harder later).`
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = data.content[0].text.trim();
+      const clean = text.replace(/```json|```/g, '').trim();
+      const suggestions = JSON.parse(clean);
+      renderSuggestions(suggestions);
+    } catch(e) {
+      // Fallback suggestions
+      renderSuggestions([
+        { title: "Research and understand the basics of your goal", duration: "1 week", why: "Foundation knowledge is essential" },
+        { title: "Find 3 resources (books, courses, mentors) for this goal", duration: "1 week", why: "Learning from the right sources saves time" },
+        { title: "Set up a daily practice routine", duration: "2 weeks", why: "Consistency builds momentum" },
+        { title: "Complete one small project or milestone", duration: "1 month", why: "Real-world practice reinforces learning" },
+        { title: "Get feedback from someone who achieved a similar goal", duration: "2 weeks", why: "Expert feedback accelerates growth" }
+      ]);
+    }
+  }
+
+  function renderSuggestions(suggestions) {
+    const container = document.getElementById('suggestionsContainer');
+    container.innerHTML = suggestions.map((s, i) => `
+      <div class="suggestion-card" style="animation-delay:${i*0.08}s" id="sug${i}">
+        <div class="suggestion-text">
+          <strong>${s.title}</strong>
+          <br><span style="font-size:12px;color:var(--muted)">${s.why}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span class="suggestion-duration">${s.duration}</span>
+          <div class="suggestion-actions">
+            <button class="approve-btn" onclick="approveSuggestion(${i}, '${s.title.replace(/'/g,"\\'")}', '${s.duration}')">✓ Add</button>
+            <button class="reject-btn" onclick="document.getElementById('sug${i}').remove()">✕</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function approveSuggestion(i, title, duration) {
+    addGoal(title, duration, true);
+    document.getElementById('sug' + i).remove();
+    showToast('Goal added to your list ✓');
+  }
+
+  async function regenerateSuggestions() {
+    if (!state.ltg) return;
+    await fetchSuggestions(state.ltg);
+  }
+
+  function addManualGoal() {
+    const text = document.getElementById('newGoalText').value.trim();
+    if (!text) return;
+    addGoal(text, 'Custom', false);
+    document.getElementById('newGoalText').value = '';
+    showToast('Goal added!');
+  }
+
+  function addGoal(title, duration, fromAI) {
+    const goal = {
+      id: state.nextId++,
+      title,
+      duration,
+      fromAI,
+      completed: false,
+      addedAt: new Date().toISOString()
+    };
+    state.goals.push(goal);
+    renderGoals();
+    updateStats();
+    updateTimeline();
+  }
+
+  function toggleGoal(id) {
+    const goal = state.goals.find(g => g.id === id);
+    if (goal) {
+      goal.completed = !goal.completed;
+      renderGoals();
+      updateStats();
+      updateTimeline();
+      if (goal.completed) showToast('🎉 Goal completed! Keep going!');
+    }
+  }
+
+  function deleteGoal(id) {
+    state.goals = state.goals.filter(g => g.id !== id);
+    renderGoals();
+    updateStats();
+    updateTimeline();
+  }
+
+  function renderGoals() {
+    const list = document.getElementById('goalsList');
+    if (state.goals.length === 0) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-icon">🎯</div><p class="empty-text">Approve AI suggestions or add your own goals above</p></div>`;
+      return;
+    }
+
+    list.innerHTML = state.goals.map((g, i) => `
+      <div class="goal-item ${g.completed ? 'completed' : ''}" style="animation-delay:${i*0.05}s">
+        <div class="goal-checkbox ${g.completed ? 'checked' : ''}" onclick="toggleGoal(${g.id})"></div>
+        <div class="goal-content">
+          <div class="goal-title">${g.title}</div>
+          <div class="goal-tags">
+            <span class="goal-tag">${g.duration}</span>
+            ${g.fromAI ? '<span class="goal-tag">AI suggested</span>' : '<span class="goal-tag">Custom</span>'}
+            ${g.completed ? '<span class="goal-tag done">Completed ✓</span>' : ''}
+          </div>
+        </div>
+        <button class="goal-delete" onclick="deleteGoal(${g.id})">×</button>
+      </div>
+    `).join('');
+  }
+
+  function updateStats() {
+    const total = state.goals.length;
+    const done = state.goals.filter(g => g.completed).length;
+    const left = total - done;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statDone').textContent = done;
+    document.getElementById('statLeft').textContent = left;
+    document.getElementById('progressPercent').textContent = pct + '%';
+    document.getElementById('progressFill').style.width = pct + '%';
+  }
+
+  function updateTimeline() {
+    const tl = document.getElementById('timeline');
+    if (state.goals.length === 0) {
+      tl.innerHTML = '<p style="color:var(--muted);font-size:14px;">Add goals to see your roadmap</p>';
+      return;
+    }
+
+    const items = [
+      { title: 'Start', desc: 'Your journey begins today', status: 'done' },
+      ...state.goals.map(g => ({
+        title: g.title,
+        desc: `Duration: ${g.duration}`,
+        status: g.completed ? 'done' : 'pending'
+      })),
+      { title: state.ltg || 'Long Term Goal', desc: 'Final destination 🏆', status: 'future' }
+    ];
+
+    // Find first incomplete
+    let currentSet = false;
+    tl.innerHTML = items.map((item, i) => {
+      let dotClass = '';
+      if (item.status === 'done') dotClass = 'done';
+      else if (!currentSet && item.status !== 'future') { dotClass = 'current'; currentSet = true; }
+      return `
+        <div class="timeline-item" style="animation-delay:${i*0.06}s">
+          <div class="timeline-dot ${dotClass}"></div>
+          <div class="timeline-content">
+            <h4>${item.title}</h4>
+            <p>${item.desc}</p>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function getCoaching() {
+    if (!state.ltg) return;
+    const coachContent = document.getElementById('coachContent');
+    coachContent.innerHTML = `<div class="coach-loading"><div class="spinner"></div><span>Analyzing your progress...</span></div>`;
+
+    const total = state.goals.length;
+    const done = state.goals.filter(g => g.completed).length;
+    const pending = state.goals.filter(g => !g.completed).map(g => g.title);
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `You are an encouraging but honest personal goal coach.
+            
+Long term goal: "${state.ltg}"
+Total short term goals: ${total}
+Completed: ${done}
+Remaining goals: ${pending.join(', ') || 'none yet'}
+Days until deadline: ${document.getElementById('ltgDaysLeft')?.textContent || 'unknown'}
+
+Give personalized, specific coaching advice in 3-4 sentences. Be direct and actionable. 
+${done === 0 && total === 0 ? 'Encourage them to add their first short term goals.' : ''}
+${done > 0 ? 'Acknowledge their progress specifically.' : ''}
+${total > 0 && done/total < 0.3 ? 'Motivate them to complete pending goals.' : ''}
+End with one specific action they should take TODAY.`
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const advice = data.content[0].text;
+      coachContent.innerHTML = `<div class="coach-message">${advice.replace(/\n/g, '<br>')}</div>`;
+    } catch(e) {
+      coachContent.innerHTML = `<div class="coach-message">You're on the right path! The key to achieving "${state.ltg}" is consistent daily action on your short term goals. Even completing one small goal today builds momentum. Focus on your next incomplete goal and take one concrete step toward it right now.</div>`;
+    }
+  }
+
+  // Set default deadline to 6 months from now
+  const defaultDate = new Date();
+  defaultDate.setMonth(defaultDate.getMonth() + 6);
+  document.getElementById('ltgDeadline').value = defaultDate.toISOString().split('T')[0];
+</script>
+</body>
+</html>
